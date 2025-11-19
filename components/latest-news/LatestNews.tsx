@@ -121,7 +121,7 @@ export default function LatestNewsPage() {
           {/* GRID */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {latest.map((item) => (
-              <div key={item.id} className="border rounded-lg shadow-sm p-4 hover:shadow-md transition">
+              <div key={item.id} className="rounded-lg shadow-sm p-4 hover:shadow-md transition">
                 
                 <p className="text-red-500 text-xs font-medium">{item.category}</p>
                 <p className="text-gray-500 text-xs mb-2">{item.time}</p>
@@ -157,7 +157,7 @@ export default function LatestNewsPage() {
 
           <div className="flex flex-col gap-5">
             {mostRead.map((item) => (
-              <div key={item.id} className="flex gap-4 border rounded-lg p-3 shadow-sm hover:shadow-md transition">
+              <div key={item.id} className="flex gap-4 rounded-lg p-3 shadow-sm hover:shadow-md transition">
                 
                 <div className="w-28 h-20 relative rounded overflow-hidden">
                   <Image src={item.image} alt="" fill className="object-cover" />
