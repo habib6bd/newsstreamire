@@ -17,7 +17,7 @@ export default function HeaderSection() {
   const hero = {
     image: "/images/hero.jpg",
     category: "বাংলাদেশ",
-    title: "শেখ হাসিনাকে ফেরত চায় বাংলাদেশ, কী আছে প্রত্যর্পণ চুক্তিতে?",
+    title: "শেখ হাসিনাকে ফেরত চায় বাংলাদেশ, কী আছে প্রত্যর্পণ চুক্তিতে ksfs?",
     description:
       "জুলনা–গণ-অভ্যুত্থানের সময় সর্বচাপ মানবতাবিরোধী অপরাধের মামলার খসড়া..."
   };
