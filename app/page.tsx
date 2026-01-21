@@ -1,5 +1,5 @@
 // import Image from "next/image";
-import HeaderSection from "@/components/navbar/headerpage/Headerpage";
+import HeaderSection from "@/components/headerpage/Headerpage";
 import LatestNewsPage from "@/components/latest-news/LatestNews";
 import BangladeshSection from "@/components/bangladesh/Bangladesh";
 
