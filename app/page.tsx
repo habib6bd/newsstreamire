@@ -2,10 +2,12 @@
 import HeaderSection from "@/components/headerpage/Headerpage";
 import LatestNewsPage from "@/components/latest-news/LatestNews";
 import BangladeshSection from "@/components/bangladesh/Bangladesh";
+import Navbar from "@/components/navbar/Navbar";
 
 export default function Home() {
   return (
      <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
+      <Navbar />
       <HeaderSection />
       <LatestNewsPage />
       <BangladeshSection />

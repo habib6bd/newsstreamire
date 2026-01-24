@@ -1,6 +1,32 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+
+type ApiImage = { id: number; image: string };
+
+type ApiNews = {
+  id: number;
+  title: string;
+  content: string;
+  category: number;
+  image: ApiImage[];
+  is_featured: boolean;
+  is_published: boolean;
+  created_at: string;
+};
+
+type NewsApiResponse = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: ApiNews[];
+};
+
+type ApiCategory = {
+  id: number;
+  name: string;
+};
 
 interface LatestNewsCard {
   id: number;
@@ -20,98 +46,114 @@ interface MostReadCard {
 }
 
 const sliceWords = (text: string, count: number) => {
-  return text.split(" ").slice(0, count).join(" ") + "...";
+  const clean = text.replace(/<[^>]*>/g, "").trim();
+  const parts = clean.split(/\s+/);
+  return parts.length > count ? parts.slice(0, count).join(" ") + "..." : clean;
 };
 
-export default function LatestNewsPage() {
-  const latest: LatestNewsCard[] = [
-    {
-      id: 1,
-      category: "বাংলাদেশ",
-      time: "৩৬ মিনিট আগে",
-      title: "ভারতকে হারানোর ২ কোটি টাকা পুরস্কার ঘোষণা",
-      description: "ভারতের বিপক্ষে ঐতিহাসিক জয়ের পর বাংলাদেশ দলের জন্য বড় পুরস্কারের ঘোষণা দেওয়া হয়েছিল...",
-      image: "/images/card1.jpg"
-    },
-    {
-      id: 2,
-      category: "বাংলাদেশ",
-      time: "৩০ মিনিট আগে",
-      title: "মধ্যরাতে গুলিস্তানে মার্কেটে আগুন",
-      description: "রাজধানীর গুলিস্তান এলাকায় দোকান ভর্তি মার্কেটে বড় ধরনের আগুন লাগে...",
-      image: "/images/card2.jpg"
-    },
-    {
-      id: 3,
-      category: "বাংলাদেশ",
-      time: "৫৬ মিনিট আগে",
-      title: "আগারগাঁওয়ে দাঁড়িয়ে থাকা গাড়িতে আগুন",
-      description: "রাজধানীর আগারগাঁও এলাকায় একটি গাড়িতে সন্ধ্যাবেলায় অগ্নিকাণ্ডের ঘটনা ঘটে...",
-      image: "/images/card3.jpg"
-    },
-    {
-      id: 4,
-      category: "খেলা",
-      time: "১ ঘণ্টা আগে",
-      title: "এফএ কাপ জয়ের চেয়েও বেশি আনন্দিত ভারত",
-      description: "ফুটবলে বড় জয়ের পর ভারতীয় সমর্থকদের মধ্যে ব্যাপক উৎসব পালিত হচ্ছে...",
-     image: "/images/card1.jpg"
-    },
-    {
-      id: 5,
-      category: "রাজনীতি",
-      time: "২ ঘণ্টা আগে",
-      title: "ভারতের বিপক্ষে জয়ের পর ফুটবলাদের প্রশংসায় মেতে",
-      description: "ভারতের বিপক্ষে জয়ের পর রাজনীতিবিদরাও অভিনন্দন জানিয়েছেন...",
-      image: "/images/card1.jpg"
-    },
-    {
-      id: 6,
-      category: "শিক্ষা",
-      time: "২ ঘণ্টা আগে",
-      title: "ব্রাক নির্বাচন নিয়ে তফসিল ঘোষণা",
-      description: "বাংলাদেশ শিক্ষা বোর্ড জাতীয় নির্বাচনের নতুন তফসিল ঘোষণা দিয়েছে...",
-      image: "/images/card1.jpg"
-    }
-  ];
+function timeAgoBn(iso: string) {
+  const t = new Date(iso).getTime();
+  const now = Date.now();
+  const diffSec = Math.max(0, Math.floor((now - t) / 1000));
+  const mins = Math.floor(diffSec / 60);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
 
-  const mostRead: MostReadCard[] = [
-    {
-      id: 1,
-      category: "বাংলাদেশ",
-      time: "১ দিন আগে",
-      title: "শেখ হাসিনার মৃত্যুদণ্ড নিয়ে যা বলল জাতিসংঘ",
-      image: "/images/card1.jpg"
-    },
-    {
-      id: 2,
-      category: "আন্তর্জাতিক",
-      time: "১ দিন আগে",
-      title: "বিশ্ব রাজনীতিতে নতুন পরিবর্তন আসছে",
-      image: "/images/card1.jpg"
-    },
-    {
-      id: 3,
-      category: "আন্তর্জাতিক",
-      time: "১ দিন আগে",
-      title: "নতুন সিদ্ধান্ত নিয়ে উদ্বেগ বাড়ছে",
-     image: "/images/card1.jpg"
-    },
-    {
-      id: 4,
-      category: "আন্তর্জাতিক",
-      time: "১ দিন আগে",
-      title: "হাসিনাকে হস্তান্তর করবে না ভারত",
-      image: "/images/card1.jpg"
+  if (days > 0) return `${days} দিন আগে`;
+  if (hrs > 0) return `${hrs} ঘণ্টা আগে`;
+  if (mins > 0) return `${mins} মিনিট আগে`;
+  return "এইমাত্র";
+}
+
+export default function LatestNewsPage() {
+  const [latest, setLatest] = useState<LatestNewsCard[]>([]);
+  const [mostRead, setMostRead] = useState<MostReadCard[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function load() {
+      try {
+        setLoading(true);
+
+        // ✅ fetch both (news + categories)
+        const [newsRes, catRes] = await Promise.all([
+          fetch("/api/news", { cache: "no-store" }),
+          fetch("/api/categories", { cache: "no-store" }),
+        ]);
+
+        if (!newsRes.ok) throw new Error(`News API Error: ${newsRes.status}`);
+        if (!catRes.ok) throw new Error(`Category API Error: ${catRes.status}`);
+
+        const newsData: NewsApiResponse = await newsRes.json();
+        const categories: ApiCategory[] = await catRes.json();
+
+        // ✅ categoryId -> categoryName map
+        const categoryMap = new Map<number, string>();
+        categories.forEach((c) => categoryMap.set(c.id, c.name));
+
+        // Prefer published; if none, use all
+        const published = newsData.results.filter((n) => n.is_published);
+        const list = published.length ? published : newsData.results;
+
+        // Sort newest first
+        const sorted = [...list].sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+
+        // Latest 6
+        const latestCards: LatestNewsCard[] = sorted.slice(0, 6).map((n) => ({
+          id: n.id,
+          category: categoryMap.get(n.category) || `Category ${n.category}`,
+          time: timeAgoBn(n.created_at),
+          title: n.title || "",
+          description: n.content || "",
+          image: n.image?.[0]?.image || "/images/card-fallback.jpg",
+        }));
+
+        // Most read (API has no views, so we prioritize featured then fill newest)
+        const featured = sorted.filter((n) => n.is_featured);
+        const filler = sorted.filter((n) => !n.is_featured);
+        const mostReadSource = [...featured, ...filler].slice(0, 4);
+
+        const mostReadCards: MostReadCard[] = mostReadSource.map((n) => ({
+          id: n.id,
+          category: categoryMap.get(n.category) || `Category ${n.category}`,
+          time: timeAgoBn(n.created_at),
+          title: n.title || "",
+          image: n.image?.[0]?.image || "/images/card-fallback.jpg",
+        }));
+
+        if (!ignore) {
+          setLatest(latestCards);
+          setMostRead(mostReadCards);
+        }
+      } catch (e) {
+        console.error(e);
+        if (!ignore) {
+          setLatest([]);
+          setMostRead([]);
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
     }
-  ];
+
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  // skeleton arrays (keeps design stable)
+  const latestSkeleton = useMemo(() => Array.from({ length: 6 }, (_, i) => i), []);
+  const mostReadSkeleton = useMemo(() => Array.from({ length: 4 }, (_, i) => i), []);
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-10 py-10">
-
-      {/* ---------- SECTION HEAD ---------- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        
         {/* ---------------- LEFT: সর্বশেষ সময় ---------------- */}
         <div className="lg:col-span-2">
           <h2 className="text-xl font-semibold mb-3 border-b pb-2 border-red-300">
@@ -120,22 +162,33 @@ export default function LatestNewsPage() {
 
           {/* GRID */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {latest.map((item) => (
-              <div key={item.id} className="rounded-lg shadow-sm p-4 hover:shadow-md transition">
-                
-                <p className="text-red-500 text-xs font-medium">{item.category}</p>
-                <p className="text-gray-500 text-xs mb-2">{item.time}</p>
+            {(loading ? latestSkeleton : latest).map((item: any, idx: number) => (
+              <div
+                key={loading ? `sk-${idx}` : item.id}
+                className="rounded-lg shadow-sm p-4 hover:shadow-md transition"
+              >
+                <p className="text-red-500 text-xs font-medium">
+                  {loading ? "\u00A0" : item.category}
+                </p>
+                <p className="text-gray-500 text-xs mb-2">
+                  {loading ? "\u00A0" : item.time}
+                </p>
 
-                <div className="w-full h-40 relative rounded-md overflow-hidden mb-3">
-                  <Image src={item.image} alt="" fill className="object-cover" />
+                <div className="w-full h-40 relative rounded-md overflow-hidden mb-3 bg-gray-100">
+                  <Image
+                    src={loading ? "/images/card-fallback.jpg" : item.image}
+                    alt=""
+                    fill
+                    className="object-cover"
+                  />
                 </div>
 
                 <h3 className="font-semibold text-lg leading-snug mb-2">
-                  {sliceWords(item.title, 10)}
+                  {loading ? "\u00A0" : sliceWords(item.title, 10)}
                 </h3>
 
                 <p className="text-sm text-gray-700">
-                  {sliceWords(item.description, 10)}
+                  {loading ? "\u00A0" : sliceWords(item.description, 10)}
                 </p>
               </div>
             ))}
@@ -156,23 +209,32 @@ export default function LatestNewsPage() {
           </h2>
 
           <div className="flex flex-col gap-5">
-            {mostRead.map((item) => (
-              <div key={item.id} className="flex gap-4 rounded-lg p-3 shadow-sm hover:shadow-md transition">
-                
-                <div className="w-28 h-20 relative rounded overflow-hidden">
-                  <Image src={item.image} alt="" fill className="object-cover" />
+            {(loading ? mostReadSkeleton : mostRead).map((item: any, idx: number) => (
+              <div
+                key={loading ? `sk2-${idx}` : item.id}
+                className="flex gap-4 rounded-lg p-3 shadow-sm hover:shadow-md transition"
+              >
+                <div className="w-28 h-20 relative rounded overflow-hidden bg-gray-100">
+                  <Image
+                    src={loading ? "/images/card-fallback.jpg" : item.image}
+                    alt=""
+                    fill
+                    className="object-cover"
+                  />
 
                   <span className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1 py-[1px] rounded">
-                    {item.time}
+                    {loading ? "\u00A0" : item.time}
                   </span>
                 </div>
 
                 {/* TEXT AREA */}
                 <div className="flex-1">
-                  <p className="text-red-500 text-xs font-medium">{item.category}</p>
+                  <p className="text-red-500 text-xs font-medium">
+                    {loading ? "\u00A0" : item.category}
+                  </p>
 
                   <h3 className="font-semibold text-sm mt-1">
-                    {sliceWords(item.title, 10)}
+                    {loading ? "\u00A0" : sliceWords(item.title, 10)}
                   </h3>
                 </div>
               </div>
@@ -186,7 +248,6 @@ export default function LatestNewsPage() {
             </button>
           </div>
         </div>
-
       </div>
     </div>
   );

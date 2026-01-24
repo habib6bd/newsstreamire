@@ -17,11 +17,16 @@ type ApiNews = {
   created_at: string;
 };
 
-type ApiResponse = {
+type NewsApiResponse = {
   count: number;
   next: string | null;
   previous: string | null;
   results: ApiNews[];
+};
+
+type ApiCategory = {
+  id: number;
+  name: string;
 };
 
 interface NewsCard {
@@ -43,7 +48,7 @@ function timeAgoBn(iso: string) {
 
   if (days > 0) return `${days} দিন আগে`;
   if (hrs > 0) return `${hrs} ঘণ্টা আগে`;
-  if (mins > 0) return `${mins} মিনিট আগে`;
+  if (mins > 0) return `${hrs} ঘণ্টা আগে`;
   return "এইমাত্র";
 }
 
@@ -55,7 +60,7 @@ function shorten(text: string, max = 120) {
 export default function HeaderSection() {
   const [hero, setHero] = useState({
     image: "/images/hero.jpg",
-    category: "বাংলাদেশ",
+    category: "Loading...",
     title: "Loading...",
     description: "",
   });
@@ -81,34 +86,56 @@ export default function HeaderSection() {
   useEffect(() => {
     let ignore = false;
 
-    async function loadNews() {
+    async function loadNewsAndCategories() {
       try {
-        const res = await fetch("/api/news", { cache: "no-store" });
-        if (!res.ok) throw new Error(`API Error: ${res.status}`);
-        const data: ApiResponse = await res.json();
+        // ✅ Fetch both at the same time
+        const [newsRes, catRes] = await Promise.all([
+          fetch("/api/news", { cache: "no-store" }),
+          fetch("/api/categories", { cache: "no-store" }),
+        ]);
 
-        const published = data.results.filter((n) => n.is_published);
-        const list = published.length ? published : data.results;
+        if (!newsRes.ok) throw new Error(`News API Error: ${newsRes.status}`);
+        if (!catRes.ok) throw new Error(`Category API Error: ${catRes.status}`);
 
-        const mapped: NewsCard[] = list.map((n) => ({
+        const newsData: NewsApiResponse = await newsRes.json();
+        const categories: ApiCategory[] = await catRes.json();
+
+        // ✅ Build categoryId -> categoryName map
+        const categoryMap = new Map<number, string>();
+        categories.forEach((c) => categoryMap.set(c.id, c.name));
+
+        // Prefer published; if none published, show all
+        const published = newsData.results.filter((n) => n.is_published);
+        const list = published.length ? published : newsData.results;
+
+        // Sort newest first
+        const sorted = [...list].sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+
+        // Featured news for hero (if no featured, use latest)
+        const featured =
+          sorted.find((n) => n.is_featured) || sorted[0] || null;
+
+        // Cards mapping
+        const mappedCards: NewsCard[] = sorted.map((n) => ({
           id: n.id,
-          category: `Category ${n.category}`,
+          category: categoryMap.get(n.category) || `Category ${n.category}`,
           time: timeAgoBn(n.created_at),
           title: n.title,
           description: shorten(n.content, 120),
           image: n.image?.[0]?.image || "/images/card-fallback.jpg",
         }));
 
-        const featured = list.find((n) => n.is_featured) || list[0];
-
         if (!ignore) {
-          setCards(mapped);
+          setCards(mappedCards);
           setIndex(0);
 
           if (featured) {
             setHero({
               image: featured.image?.[0]?.image || "/images/hero.jpg",
-              category: `Category ${featured.category}`,
+              category: categoryMap.get(featured.category) || `Category ${featured.category}`,
               title: featured.title,
               description: shorten(featured.content, 160),
             });
@@ -119,7 +146,7 @@ export default function HeaderSection() {
       }
     }
 
-    loadNews();
+    loadNewsAndCategories();
     return () => {
       ignore = true;
     };
@@ -165,7 +192,9 @@ export default function HeaderSection() {
         />
 
         <div className="absolute inset-0 px-6 md:px-16 lg:px-28 flex flex-col justify-center">
-          <p className="text-red-400 text-sm md:text-base mb-2">{hero.category}</p>
+          <p className="text-red-400 text-sm md:text-base mb-2">
+            {hero.category}
+          </p>
 
           <h1 className="text-white font-bold text-2xl md:text-4xl lg:text-5xl leading-snug max-w-3xl">
             {hero.title}
@@ -190,11 +219,12 @@ export default function HeaderSection() {
             {cards.map((card) => (
               <div
                 key={card.id}
-                // ✅ THIS is the fix: all cards equal size
                 className="bg-white p-5 rounded-xl shadow-md flex-shrink-0 basis-full md:basis-1/2 lg:basis-1/3"
               >
                 <div className="flex justify-between text-xs mb-2">
-                  <span className="text-red-600 font-medium">{card.category}</span>
+                  <span className="text-red-600 font-medium">
+                    {card.category}
+                  </span>
                   <span className="text-gray-500">{card.time}</span>
                 </div>
 
@@ -202,10 +232,17 @@ export default function HeaderSection() {
                   {card.title}
                 </h2>
 
-                <p className="text-sm text-gray-700 mb-3">{card.description}</p>
+                <p className="text-sm text-gray-700 mb-3">
+                  {card.description}
+                </p>
 
                 <div className="w-full h-44 relative rounded-md overflow-hidden">
-                  <Image src={card.image} alt="card image" fill className="object-cover" />
+                  <Image
+                    src={card.image}
+                    alt="card image"
+                    fill
+                    className="object-cover"
+                  />
                 </div>
               </div>
             ))}

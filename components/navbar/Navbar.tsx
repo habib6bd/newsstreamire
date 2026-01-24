@@ -1,14 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaSearch, FaPlay } from "react-icons/fa";
+
+type ApiCategory = {
+  id: number;
+  name: string;
+  // news exists but we don't need it for navbar
+  news?: unknown[];
+};
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
 
   // FIXED: Prevent hydration mismatch by rendering date only on client
   const [currentDate, setCurrentDate] = useState<string>("");
+
+  // ✅ categories state
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [catLoading, setCatLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const formatted = new Date().toLocaleDateString("bn-BD", {
@@ -20,14 +31,64 @@ export default function Navbar() {
     setCurrentDate(formatted);
   }, []);
 
+  // ✅ fetch categories
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadCategories() {
+      try {
+        setCatLoading(true);
+
+        const res = await fetch("/api/categories", { cache: "no-store" });
+        if (!res.ok) throw new Error(`API Error: ${res.status}`);
+
+        const data: ApiCategory[] = await res.json();
+
+        // Keep order as API returns; remove empty names; optional: unique by id
+        const cleaned = (data || []).filter((c) => c?.name?.trim());
+
+        if (!ignore) setCategories(cleaned);
+      } catch (e) {
+        console.error(e);
+        if (!ignore) setCategories([]);
+      } finally {
+        if (!ignore) setCatLoading(false);
+      }
+    }
+
+    loadCategories();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  // ✅ split categories: show first 7 as main, rest under "আরও"
+  const MAIN_COUNT = 7;
+
+  const mainCats = useMemo(
+    () => categories.slice(0, MAIN_COUNT),
+    [categories]
+  );
+  const moreCats = useMemo(
+    () => categories.slice(MAIN_COUNT),
+    [categories]
+  );
+
+  // Optional: click behavior placeholder (later you can route to /category/[id] or /category/[slug])
+  const onCategoryClick = (cat: ApiCategory) => {
+    // Example later:
+    // router.push(`/category/${cat.id}`)
+    console.log("Category clicked:", cat);
+    setMenuOpen(false);
+  };
+
   return (
     <div className="w-full shadow-sm bg-white">
       {/* -------- TOP BAR -------- */}
       <div className="flex justify-between items-center px-4 lg:px-10 py-3 flex-wrap gap-4">
-        
         {/* Logo + Search */}
         <div className="flex items-center gap-4 w-full lg:w-auto">
-          <Image 
+          <Image
             src="/images/newsstream_logo.jpeg"
             width={60}
             height={60}
@@ -48,7 +109,7 @@ export default function Navbar() {
 
         {/* Date (client only) */}
         <div className="text-sm text-gray-700 w-full lg:w-auto text-right">
-          {currentDate || "\u00A0" /* keeps layout stable */}
+          {currentDate || "\u00A0"}
         </div>
       </div>
 
@@ -76,29 +137,46 @@ export default function Navbar() {
       {/* -------- NAVBAR MENU -------- */}
       <div className="w-full bg-black text-white">
         <div className="flex justify-between items-center px-4 lg:px-10 py-3">
-          
           {/* MAIN MENU ITEMS */}
-          <div className="hidden lg:flex gap-8 text-sm font-medium">
-            <span className="cursor-pointer hover:text-red-400">বাংলাদেশ</span>
-            <span className="cursor-pointer hover:text-red-400">রাজনীতি</span>
-            <span className="cursor-pointer hover:text-red-400">আন্তর্জাতিক</span>
-            <span className="cursor-pointer hover:text-red-400">খেলা</span>
-            <span className="cursor-pointer hover:text-red-400">বিনোদন</span>
-            <span className="cursor-pointer hover:text-red-400">স্বাস্থ্য</span>
-            <span className="cursor-pointer hover:text-red-400">বাণিজ্য</span>
+          <div className="hidden lg:flex gap-8 text-sm font-medium items-center">
+            {/* Loading placeholders keep spacing stable */}
+            {catLoading && (
+              <>
+                <span className="opacity-60">লোড হচ্ছে...</span>
+              </>
+            )}
 
-            {/* Dropdown */}
-            <div className="relative group">
-              <button className="bg-gray-700 px-3 py-1 rounded-md flex items-center gap-1">
-                আরও ▼
-              </button>
+            {!catLoading &&
+              mainCats.map((cat) => (
+                <span
+                  key={cat.id}
+                  className="cursor-pointer hover:text-red-400"
+                  onClick={() => onCategoryClick(cat)}
+                >
+                  {cat.name}
+                </span>
+              ))}
 
-              <div className="absolute left-0 top-full mt-2 bg-gray-900 text-white rounded-md shadow-lg p-3 hidden group-hover:block">
-                <p className="hover:text-red-400 cursor-pointer mb-2">টেক</p>
-                <p className="hover:text-red-400 cursor-pointer mb-2">জীবনধারা</p>
-                <p className="hover:text-red-400 cursor-pointer">ফিচার</p>
+            {/* Dropdown: show only if we have extra categories */}
+            {!catLoading && moreCats.length > 0 && (
+              <div className="relative group">
+                <button className="bg-gray-700 px-3 py-1 rounded-md flex items-center gap-1">
+                  আরও ▼
+                </button>
+
+                <div className="absolute left-0 top-full mt-2 bg-gray-900 text-white rounded-md shadow-lg p-3 hidden group-hover:block min-w-40">
+                  {moreCats.map((cat) => (
+                    <p
+                      key={cat.id}
+                      className="hover:text-red-400 cursor-pointer mb-2 last:mb-0"
+                      onClick={() => onCategoryClick(cat)}
+                    >
+                      {cat.name}
+                    </p>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* LANGUAGE */}
@@ -118,14 +196,22 @@ export default function Navbar() {
         {/* MOBILE MENU LIST */}
         {menuOpen && (
           <div className="lg:hidden bg-gray-900 p-4 flex flex-col gap-3 text-sm">
-            <span>বাংলাদেশ</span>
-            <span>রাজনীতি</span>
-            <span>আন্তর্জাতিক</span>
-            <span>খেলা</span>
-            <span>বিনোদন</span>
-            <span>স্বাস্থ্য</span>
-            <span>বাণিজ্য</span>
-            <span>আরও...</span>
+            {catLoading && <span className="opacity-60">লোড হচ্ছে...</span>}
+
+            {!catLoading &&
+              categories.map((cat) => (
+                <span
+                  key={cat.id}
+                  className="cursor-pointer hover:text-red-400"
+                  onClick={() => onCategoryClick(cat)}
+                >
+                  {cat.name}
+                </span>
+              ))}
+
+            {!catLoading && categories.length === 0 && (
+              <span className="opacity-60">ক্যাটেগরি পাওয়া যায়নি</span>
+            )}
           </div>
         )}
       </div>
