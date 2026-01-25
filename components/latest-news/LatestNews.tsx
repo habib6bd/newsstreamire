@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 
 type ApiImage = { id: number; image: string };
 
@@ -77,7 +78,6 @@ export default function LatestNewsPage() {
       try {
         setLoading(true);
 
-        // ✅ fetch both (news + categories)
         const [newsRes, catRes] = await Promise.all([
           fetch("/api/news", { cache: "no-store" }),
           fetch("/api/categories", { cache: "no-store" }),
@@ -89,15 +89,12 @@ export default function LatestNewsPage() {
         const newsData: NewsApiResponse = await newsRes.json();
         const categories: ApiCategory[] = await catRes.json();
 
-        // ✅ categoryId -> categoryName map
         const categoryMap = new Map<number, string>();
         categories.forEach((c) => categoryMap.set(c.id, c.name));
 
-        // Prefer published; if none, use all
         const published = newsData.results.filter((n) => n.is_published);
         const list = published.length ? published : newsData.results;
 
-        // Sort newest first
         const sorted = [...list].sort(
           (a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -113,7 +110,7 @@ export default function LatestNewsPage() {
           image: n.image?.[0]?.image || "/images/card-fallback.jpg",
         }));
 
-        // Most read (API has no views, so we prioritize featured then fill newest)
+        // Most read (featured first)
         const featured = sorted.filter((n) => n.is_featured);
         const filler = sorted.filter((n) => !n.is_featured);
         const mostReadSource = [...featured, ...filler].slice(0, 4);
@@ -147,7 +144,6 @@ export default function LatestNewsPage() {
     };
   }, []);
 
-  // skeleton arrays (keeps design stable)
   const latestSkeleton = useMemo(() => Array.from({ length: 6 }, (_, i) => i), []);
   const mostReadSkeleton = useMemo(() => Array.from({ length: 4 }, (_, i) => i), []);
 
@@ -162,36 +158,41 @@ export default function LatestNewsPage() {
 
           {/* GRID */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {(loading ? latestSkeleton : latest).map((item: any, idx: number) => (
-              <div
-                key={loading ? `sk-${idx}` : item.id}
-                className="rounded-lg shadow-sm p-4 hover:shadow-md transition"
-              >
-                <p className="text-red-500 text-xs font-medium">
-                  {loading ? "\u00A0" : item.category}
-                </p>
-                <p className="text-gray-500 text-xs mb-2">
-                  {loading ? "\u00A0" : item.time}
-                </p>
+            {(loading ? latestSkeleton : latest).map((item: any, idx: number) => {
+              const href = loading ? "#" : `/news-detail/${item.id}`;
 
-                <div className="w-full h-40 relative rounded-md overflow-hidden mb-3 bg-gray-100">
-                  <Image
-                    src={loading ? "/images/card-fallback.jpg" : item.image}
-                    alt=""
-                    fill
-                    className="object-cover"
-                  />
-                </div>
+              return (
+                <Link
+                  key={loading ? `sk-${idx}` : item.id}
+                  href={href}
+                  className="rounded-lg shadow-sm p-4 hover:shadow-md transition cursor-pointer block"
+                >
+                  <p className="text-red-500 text-xs font-medium">
+                    {loading ? "\u00A0" : item.category}
+                  </p>
+                  <p className="text-gray-500 text-xs mb-2">
+                    {loading ? "\u00A0" : item.time}
+                  </p>
 
-                <h3 className="font-semibold text-lg leading-snug mb-2">
-                  {loading ? "\u00A0" : sliceWords(item.title, 10)}
-                </h3>
+                  <div className="w-full h-40 relative rounded-md overflow-hidden mb-3 bg-gray-100">
+                    <Image
+                      src={loading ? "/images/card-fallback.jpg" : item.image}
+                      alt={loading ? "" : item.title}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
 
-                <p className="text-sm text-gray-700">
-                  {loading ? "\u00A0" : sliceWords(item.description, 10)}
-                </p>
-              </div>
-            ))}
+                  <h3 className="font-semibold text-lg leading-snug mb-2">
+                    {loading ? "\u00A0" : sliceWords(item.title, 10)}
+                  </h3>
+
+                  <p className="text-sm text-gray-700">
+                    {loading ? "\u00A0" : sliceWords(item.description, 10)}
+                  </p>
+                </Link>
+              );
+            })}
           </div>
 
           {/* BUTTON */}
@@ -209,36 +210,40 @@ export default function LatestNewsPage() {
           </h2>
 
           <div className="flex flex-col gap-5">
-            {(loading ? mostReadSkeleton : mostRead).map((item: any, idx: number) => (
-              <div
-                key={loading ? `sk2-${idx}` : item.id}
-                className="flex gap-4 rounded-lg p-3 shadow-sm hover:shadow-md transition"
-              >
-                <div className="w-28 h-20 relative rounded overflow-hidden bg-gray-100">
-                  <Image
-                    src={loading ? "/images/card-fallback.jpg" : item.image}
-                    alt=""
-                    fill
-                    className="object-cover"
-                  />
+            {(loading ? mostReadSkeleton : mostRead).map((item: any, idx: number) => {
+              const href = loading ? "#" : `/news-detail/${item.id}`;
 
-                  <span className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1 py-[1px] rounded">
-                    {loading ? "\u00A0" : item.time}
-                  </span>
-                </div>
+              return (
+                <Link
+                  key={loading ? `sk2-${idx}` : item.id}
+                  href={href}
+                  className="flex gap-4 rounded-lg p-3 shadow-sm hover:shadow-md transition cursor-pointer block"
+                >
+                  <div className="w-28 h-20 relative rounded overflow-hidden bg-gray-100">
+                    <Image
+                      src={loading ? "/images/card-fallback.jpg" : item.image}
+                      alt={loading ? "" : item.title}
+                      fill
+                      className="object-cover"
+                    />
 
-                {/* TEXT AREA */}
-                <div className="flex-1">
-                  <p className="text-red-500 text-xs font-medium">
-                    {loading ? "\u00A0" : item.category}
-                  </p>
+                    <span className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1 py-[1px] rounded">
+                      {loading ? "\u00A0" : item.time}
+                    </span>
+                  </div>
 
-                  <h3 className="font-semibold text-sm mt-1">
-                    {loading ? "\u00A0" : sliceWords(item.title, 10)}
-                  </h3>
-                </div>
-              </div>
-            ))}
+                  <div className="flex-1">
+                    <p className="text-red-500 text-xs font-medium">
+                      {loading ? "\u00A0" : item.category}
+                    </p>
+
+                    <h3 className="font-semibold text-sm mt-1">
+                      {loading ? "\u00A0" : sliceWords(item.title, 10)}
+                    </h3>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
 
           {/* BUTTON */}

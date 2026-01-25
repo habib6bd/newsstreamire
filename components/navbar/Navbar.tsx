@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaSearch, FaPlay } from "react-icons/fa";
+import Link from "next/link";
 
 type ApiCategory = {
   id: number;
@@ -88,12 +89,14 @@ export default function Navbar() {
       <div className="flex justify-between items-center px-4 lg:px-10 py-3 flex-wrap gap-4">
         {/* Logo + Search */}
         <div className="flex items-center gap-4 w-full lg:w-auto">
+          <Link href="/">
           <Image
             src="/images/newsstream_logo.jpeg"
             width={60}
             height={60}
             alt="Logo"
           />
+          </Link>
 
           <div className="flex items-center w-full border rounded-lg overflow-hidden">
             <input

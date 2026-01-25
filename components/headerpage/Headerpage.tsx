@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaArrowLeft, FaArrowRight } from "react-icons/fa";
+import Link from "next/link";
 
 type ApiImage = { id: number; image: string };
 
@@ -48,25 +49,31 @@ function timeAgoBn(iso: string) {
 
   if (days > 0) return `${days} দিন আগে`;
   if (hrs > 0) return `${hrs} ঘণ্টা আগে`;
-  if (mins > 0) return `${hrs} ঘণ্টা আগে`;
+  if (mins > 0) return `${mins} মিনিট আগে`;
   return "এইমাত্র";
 }
 
 function shorten(text: string, max = 120) {
-  const clean = text.replace(/<[^>]*>/g, "").trim();
+  const clean = (text || "").replace(/<[^>]*>/g, "").trim();
   return clean.length > max ? clean.slice(0, max).trimEnd() + "..." : clean;
 }
 
+type HeroState = {
+  id: number;
+  image: string;
+  category: string;
+  title: string;
+  description: string;
+};
+
 export default function HeaderSection() {
-  const [hero, setHero] = useState({
-    image: "/images/hero.jpg",
-    category: "Loading...",
-    title: "Loading...",
-    description: "",
-  });
+  // ✅ hero starts as null so we don't show any default image
+  const [hero, setHero] = useState<HeroState | null>(null);
 
   const [cards, setCards] = useState<NewsCard[]>([]);
   const [index, setIndex] = useState(0);
+
+  const [loadingHero, setLoadingHero] = useState(true);
 
   // Keep your screenshot layout: 3 on lg, 2 on md, 1 on mobile
   const [visibleCards, setVisibleCards] = useState(3);
@@ -88,7 +95,8 @@ export default function HeaderSection() {
 
     async function loadNewsAndCategories() {
       try {
-        // ✅ Fetch both at the same time
+        setLoadingHero(true);
+
         const [newsRes, catRes] = await Promise.all([
           fetch("/api/news", { cache: "no-store" }),
           fetch("/api/categories", { cache: "no-store" }),
@@ -100,25 +108,19 @@ export default function HeaderSection() {
         const newsData: NewsApiResponse = await newsRes.json();
         const categories: ApiCategory[] = await catRes.json();
 
-        // ✅ Build categoryId -> categoryName map
         const categoryMap = new Map<number, string>();
         categories.forEach((c) => categoryMap.set(c.id, c.name));
 
-        // Prefer published; if none published, show all
         const published = newsData.results.filter((n) => n.is_published);
         const list = published.length ? published : newsData.results;
 
-        // Sort newest first
         const sorted = [...list].sort(
           (a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
-        // Featured news for hero (if no featured, use latest)
-        const featured =
-          sorted.find((n) => n.is_featured) || sorted[0] || null;
+        const featured = sorted.find((n) => n.is_featured) || sorted[0] || null;
 
-        // Cards mapping
         const mappedCards: NewsCard[] = sorted.map((n) => ({
           id: n.id,
           category: categoryMap.get(n.category) || `Category ${n.category}`,
@@ -133,16 +135,25 @@ export default function HeaderSection() {
           setIndex(0);
 
           if (featured) {
+            const heroImage = featured.image?.[0]?.image;
+            // ✅ only set hero if API actually has data
             setHero({
-              image: featured.image?.[0]?.image || "/images/hero.jpg",
-              category: categoryMap.get(featured.category) || `Category ${featured.category}`,
+              id: featured.id,
+              image: heroImage || "/images/hero.jpg", // (fallback only if API has no image)
+              category:
+                categoryMap.get(featured.category) || `Category ${featured.category}`,
               title: featured.title,
               description: shorten(featured.content, 160),
             });
+          } else {
+            setHero(null);
           }
         }
       } catch (e) {
         console.error(e);
+        if (!ignore) setHero(null);
+      } finally {
+        if (!ignore) setLoadingHero(false);
       }
     }
 
@@ -159,50 +170,74 @@ export default function HeaderSection() {
     setIndex((i) => Math.min(i, maxIndex));
   }, [visibleCards, cards.length]);
 
+  const canSlide = cards.length > visibleCards;
+
   const prevSlide = () => {
-    if (cards.length <= visibleCards) return;
+    if (!canSlide) return;
     setIndex((prev) => (prev === 0 ? cards.length - visibleCards : prev - 1));
   };
 
   const nextSlide = () => {
-    if (cards.length <= visibleCards) return;
+    if (!canSlide) return;
     setIndex((prev) => (prev >= cards.length - visibleCards ? 0 : prev + 1));
   };
 
   // auto slide
   useEffect(() => {
-    if (cards.length <= visibleCards) return;
+    if (!canSlide) return;
     const id = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       setIndex((prev) => (prev >= cards.length - visibleCards ? 0 : prev + 1));
     }, 3500);
     return () => window.clearInterval(id);
-  }, [cards.length, visibleCards]);
+  }, [canSlide, cards.length, visibleCards]);
+
+  const sliderTransform = useMemo(
+    () => `translateX(-${index * (100 / visibleCards)}%)`,
+    [index, visibleCards]
+  );
 
   return (
     <div className="w-full">
       {/* ---------------- HERO SECTION ---------------- */}
       <div className="relative w-full h-[60vh] md:h-[70vh] lg:h-[80vh]">
-        <Image
-          src={hero.image}
-          alt="Hero"
-          fill
-          className="object-cover brightness-[0.25]"
-          priority
-        />
+        {/* ✅ No default hero flash: show skeleton while loading */}
+        {loadingHero || !hero ? (
+          <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+        ) : (
+          <Link href={`/news-detail/${hero.id}`} className="block absolute inset-0">
+            <Image
+              src={hero.image}
+              alt={hero.title}
+              fill
+              className="object-cover brightness-[0.25]"
+              priority
+            />
+          </Link>
+        )}
 
         <div className="absolute inset-0 px-6 md:px-16 lg:px-28 flex flex-col justify-center">
-          <p className="text-red-400 text-sm md:text-base mb-2">
-            {hero.category}
-          </p>
+          {loadingHero || !hero ? (
+            <div className="space-y-4 max-w-3xl">
+              <div className="h-4 w-28 bg-white/30 rounded animate-pulse" />
+              <div className="h-10 w-full bg-white/20 rounded animate-pulse" />
+              <div className="h-5 w-2/3 bg-white/20 rounded animate-pulse" />
+            </div>
+          ) : (
+            <Link href={`/news-detail/${hero.id}`} className="block">
+              <p className="text-red-400 text-sm md:text-base mb-2">
+                {hero.category}
+              </p>
 
-          <h1 className="text-white font-bold text-2xl md:text-4xl lg:text-5xl leading-snug max-w-3xl">
-            {hero.title}
-          </h1>
+              <h1 className="text-white font-bold text-2xl md:text-4xl lg:text-5xl leading-snug max-w-3xl">
+                {hero.title}
+              </h1>
 
-          <p className="text-gray-200 text-base md:text-lg max-w-xl mt-4">
-            {hero.description}
-          </p>
+              <p className="text-gray-200 text-base md:text-lg max-w-xl mt-4">
+                {hero.description}
+              </p>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -212,19 +247,17 @@ export default function HeaderSection() {
         <div className="overflow-hidden">
           <div
             className="flex transition-transform duration-500 gap-6"
-            style={{
-              transform: `translateX(-${index * (100 / visibleCards)}%)`,
-            }}
+            style={{ transform: sliderTransform }}
           >
             {cards.map((card) => (
-              <div
+              <Link
                 key={card.id}
-                className="bg-white p-5 rounded-xl shadow-md flex-shrink-0 basis-full md:basis-1/2 lg:basis-1/3"
+                href={`/news-detail/${card.id}`}
+                className="bg-white p-5 rounded-xl shadow-md flex-shrink-0 basis-full md:basis-1/2 lg:basis-1/3
+                           hover:shadow-lg transition-shadow duration-200 cursor-pointer block"
               >
                 <div className="flex justify-between text-xs mb-2">
-                  <span className="text-red-600 font-medium">
-                    {card.category}
-                  </span>
+                  <span className="text-red-600 font-medium">{card.category}</span>
                   <span className="text-gray-500">{card.time}</span>
                 </div>
 
@@ -232,19 +265,17 @@ export default function HeaderSection() {
                   {card.title}
                 </h2>
 
-                <p className="text-sm text-gray-700 mb-3">
-                  {card.description}
-                </p>
+                <p className="text-sm text-gray-700 mb-3">{card.description}</p>
 
                 <div className="w-full h-44 relative rounded-md overflow-hidden">
                   <Image
                     src={card.image}
-                    alt="card image"
+                    alt={card.title}
                     fill
                     className="object-cover"
                   />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -253,14 +284,16 @@ export default function HeaderSection() {
         <div className="flex justify-between items-center mt-8 px-4">
           <button
             onClick={prevSlide}
-            className="bg-gray-100 hover:bg-gray-200 p-3 rounded-full shadow"
+            disabled={!canSlide}
+            className="bg-gray-100 hover:bg-gray-200 disabled:opacity-50 p-3 rounded-full shadow"
           >
             <FaArrowLeft />
           </button>
 
           <button
             onClick={nextSlide}
-            className="bg-gray-100 hover:bg-gray-200 p-3 rounded-full shadow"
+            disabled={!canSlide}
+            className="bg-gray-100 hover:bg-gray-200 disabled:opacity-50 p-3 rounded-full shadow"
           >
             <FaArrowRight />
           </button>
