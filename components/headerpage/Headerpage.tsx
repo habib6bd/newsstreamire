@@ -127,7 +127,7 @@ export default function HeaderSection() {
           time: timeAgoBn(n.created_at),
           title: n.title,
           description: shorten(n.content, 120),
-          image: n.image?.[0]?.image || "/images/card-fallback.jpg",
+          image: n.image?.[0]?.image || "/images/newsstream_logo.jpeg",
         }));
 
         if (!ignore) {

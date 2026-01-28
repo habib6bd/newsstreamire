@@ -29,7 +29,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!auth) return;
-    if (auth.user) router.replace("/dashboard");
+    if (auth.user) router.replace("/admin"); // change to your real route
   }, [auth, router]);
 
   const onSubmit = async (data: LoginFormValues) => {

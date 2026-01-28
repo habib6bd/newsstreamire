@@ -21,8 +21,6 @@ export type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const API_BASE_URL = "https://dpi-news.vercel.app/api";
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
@@ -33,11 +31,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/jwt/create`, {
+      // ✅ IMPORTANT: call your Next.js proxy (no CORS)
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Djoser/SimpleJWT commonly accepts "email" OR "username" depending on config
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -48,9 +46,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      // data should contain: { access: "...", refresh: "..." }
-      // If you want to store tokens client-side (not ideal), you could store them here.
-      // For now we just mark the user as logged in.
+      // ✅ Option 3: store tokens (simple way)
+      if (data?.access) localStorage.setItem("access", data.access);
+      if (data?.refresh) localStorage.setItem("refresh", data.refresh);
+
+      // mark logged in
       setUser({ email });
       return true;
     } catch {
@@ -63,6 +63,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    // ✅ clear tokens on logout
+    localStorage.removeItem("access");
+    localStorage.removeItem("refresh");
+
     setUser(null);
     setError(null);
   }, []);

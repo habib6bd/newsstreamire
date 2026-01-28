@@ -107,7 +107,7 @@ export default function LatestNewsPage() {
           time: timeAgoBn(n.created_at),
           title: n.title || "",
           description: n.content || "",
-          image: n.image?.[0]?.image || "/images/card-fallback.jpg",
+          image: n.image?.[0]?.image || "/images/newsstream_logo.jpeg",
         }));
 
         // Most read (featured first)
@@ -120,7 +120,7 @@ export default function LatestNewsPage() {
           category: categoryMap.get(n.category) || `Category ${n.category}`,
           time: timeAgoBn(n.created_at),
           title: n.title || "",
-          image: n.image?.[0]?.image || "/images/card-fallback.jpg",
+          image: n.image?.[0]?.image || "/images/newsstream_logo.jpeg",
         }));
 
         if (!ignore) {
@@ -176,7 +176,7 @@ export default function LatestNewsPage() {
 
                   <div className="w-full h-40 relative rounded-md overflow-hidden mb-3 bg-gray-100">
                     <Image
-                      src={loading ? "/images/card-fallback.jpg" : item.image}
+                      src={loading ? "/images/newsstream_logo.jpeg" : item.image}
                       alt={loading ? "" : item.title}
                       fill
                       className="object-cover"
@@ -221,7 +221,7 @@ export default function LatestNewsPage() {
                 >
                   <div className="w-28 h-20 relative rounded overflow-hidden bg-gray-100">
                     <Image
-                      src={loading ? "/images/card-fallback.jpg" : item.image}
+                      src={loading ? "/images/newsstream_logo.jpeg" : item.image}
                       alt={loading ? "" : item.title}
                       fill
                       className="object-cover"
