@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { FaSearch, FaPlay } from "react-icons/fa";
 import Link from "next/link";
+import LanguageToggle from "../language/LanguageToggle";
 
 type ApiCategory = {
   id: number;
@@ -90,12 +91,12 @@ export default function Navbar() {
         {/* Logo + Search */}
         <div className="flex items-center gap-4 w-full lg:w-auto">
           <Link href="/">
-          <Image
-            src="/images/newsstream_logo.jpeg"
-            width={60}
-            height={60}
-            alt="Logo"
-          />
+            <Image
+              src="/images/newsstream_logo.jpeg"
+              width={60}
+              height={60}
+              alt="Logo"
+            />
           </Link>
 
           <div className="flex items-center w-full border rounded-lg overflow-hidden">
@@ -124,17 +125,17 @@ export default function Navbar() {
             সর্বশেষ সংবাদ
           </button>
 
-          <button className="flex items-center gap-2 bg-red-100 text-red-600 px-4 py-2 rounded-full text-sm font-semibold">
+          {/* <button className="flex items-center gap-2 bg-red-100 text-red-600 px-4 py-2 rounded-full text-sm font-semibold">
             <FaPlay />
             ভিডিও সংবাদ
-          </button>
+          </button> */}
         </div>
 
         {/* Right Button */}
-        <button className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
+        {/* <button className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
           <FaPlay />
           লাইভ টিভি
-        </button>
+        </button> */}
       </div>
 
       {/* -------- NAVBAR MENU -------- */}
@@ -182,10 +183,13 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* LANGUAGE */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm">EN</span>
+          {/* LANGUAGE TOGGLE */}
+          <div className="flex items-center gap-2 cursor-pointer select-none">
+            {/* LANGUAGE */}
+            <LanguageToggle />
+
           </div>
+
 
           {/* MOBILE BUTTON */}
           <button

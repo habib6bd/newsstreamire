@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type ApiCategory = { id: number; name: string };
@@ -14,8 +14,8 @@ export default function CreateNewsPage() {
   const [isFeatured, setIsFeatured] = useState(false);
   const [isPublished, setIsPublished] = useState(true);
 
-  // simple image support (URL)
-  const [imageUrl, setImageUrl] = useState("");
+  // ✅ File upload (single or multiple)
+  const [files, setFiles] = useState<File[]>([]);
 
   const [cats, setCats] = useState<ApiCategory[]>([]);
   const [saving, setSaving] = useState(false);
@@ -40,6 +40,39 @@ export default function CreateNewsPage() {
     };
   }, []);
 
+  const previews = useMemo(() => {
+    return files.map((f) => ({
+      name: f.name,
+      url: URL.createObjectURL(f),
+      size: f.size,
+      type: f.type,
+    }));
+  }, [files]);
+
+  useEffect(() => {
+    // cleanup object urls
+    return () => {
+      previews.forEach((p) => URL.revokeObjectURL(p.url));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files]);
+
+  function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const list = Array.from(e.target.files || []);
+    if (!list.length) return;
+
+    // ✅ Only images
+    const onlyImages = list.filter((f) => f.type.startsWith("image/"));
+    setFiles((prev) => [...prev, ...onlyImages]);
+
+    // allow selecting same file again
+    e.target.value = "";
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -53,21 +86,16 @@ export default function CreateNewsPage() {
     try {
       const token = localStorage.getItem("access");
 
-      // payload based on your API shape
-      const payload: any = {
-        title,
-        content,
+      // 1) ✅ Create news first
+      const payload = {
+        title: title.trim(),
+        content: content.trim(),
         category,
         is_featured: isFeatured,
         is_published: isPublished,
       };
 
-      // If API accepts image array from URL (common in serializers)
-      if (imageUrl.trim()) {
-        payload.image = [{ image: imageUrl.trim() }];
-      }
-
-      const res = await fetch("/api/news", {
+      const createRes = await fetch("/api/news", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -76,14 +104,57 @@ export default function CreateNewsPage() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const created = await createRes.json().catch(() => ({}));
 
-      if (!res.ok) {
-        setError(data?.detail || data?.message || `API Error: ${res.status}`);
+      if (!createRes.ok) {
+        setError(created?.detail || created?.message || `API Error: ${createRes.status}`);
         return;
       }
 
-      // success
+      const newsId = created?.id;
+      if (!newsId) {
+        setError("News created, but no ID returned from API.");
+        return;
+      }
+
+      // 2) ✅ Upload selected images (if any)
+      if (files.length) {
+        for (const file of files) {
+          const fd = new FormData();
+          // Swagger shows field name: "image"
+          fd.append("image", file, file.name);
+
+          const upRes = await fetch(`/api/news/${newsId}/images`, {
+            method: "POST",
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: fd,
+          });
+
+          const upText = await upRes.text();
+          let upData: any = {};
+          try {
+            upData = upText ? JSON.parse(upText) : {};
+          } catch {
+            upData = { raw: upText };
+          }
+
+          if (!upRes.ok) {
+            setError(
+              upData?.detail ||
+              upData?.message ||
+              upData?.image?.[0] ||        // ✅ DRF often returns { image: ["..."] }
+              upData?.non_field_errors?.[0] ||
+              `Image upload failed (status ${upRes.status})`
+            );
+            return;
+          }
+
+        }
+      }
+
+      // ✅ Done
       router.push("/admin/news");
     } catch {
       setError("Network error");
@@ -137,7 +208,7 @@ export default function CreateNewsPage() {
             </label>
             <select
               value={category}
-              onChange={(e) => setCategory(Number(e.target.value))}
+              onChange={(e) => setCategory(e.target.value ? Number(e.target.value) : "")}
               className="w-full border rounded-md px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">একটি ক্যাটাগরি নির্বাচন করুন</option>
@@ -149,19 +220,57 @@ export default function CreateNewsPage() {
             </select>
           </div>
 
+          {/* ✅ IMAGE UPLOAD */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Image URL (optional)
+              ছবি আপলোড করুন (এক বা একাধিক)
             </label>
-            <input
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full border rounded-md px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 mt-2">
-              If your backend requires file upload instead, tell me the upload endpoint—then I’ll switch this to file upload.
-            </p>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black">
+                <span>Choose Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={onPickFiles}
+                  className="hidden"
+                />
+              </label>
+
+              <p className="text-xs text-gray-500">
+                PNG/JPG/WebP — multiple files supported
+              </p>
+            </div>
+
+            {files.length ? (
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {previews.map((p, i) => (
+                  <div key={p.url} className="relative rounded-lg border overflow-hidden">
+                    {/* preview */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.url} alt={p.name} className="h-28 w-full object-cover" />
+
+                    <div className="p-2">
+                      <p className="text-xs font-semibold text-gray-800 line-clamp-1">
+                        {p.name}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(i)}
+                        className="mt-2 w-full rounded-md bg-rose-500 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-600"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 rounded-md border border-dashed p-4 text-sm text-gray-500">
+                কোনো ছবি সিলেক্ট করা হয়নি।
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -195,7 +304,7 @@ export default function CreateNewsPage() {
               disabled={saving}
               className="w-full rounded-md bg-blue-700 text-white py-3 font-bold hover:bg-blue-800 disabled:opacity-60"
             >
-              {saving ? "Saving..." : "নিউজ তৈরি করুন"}
+              {saving ? "Saving..." : "নিউজ তৈরি করুন & ছবি আপলোড করুন"}
             </button>
           </div>
         </form>

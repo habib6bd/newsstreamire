@@ -9,7 +9,7 @@ export default function Home() {
      <div className="min-h-screen bg-zinc-50 font-sans dark:bg-black">
       <HeaderSection />
       <LatestNewsPage />
-      <BangladeshSection />
+      {/* <BangladeshSection /> */}
     </div>
   );
 }

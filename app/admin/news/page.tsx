@@ -28,17 +28,26 @@ export default function AdminNewsList() {
   const [rows, setRows] = useState<ApiNews[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // ✅ UX states for delete
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [error, setError] = useState<string>("");
+
   useEffect(() => {
     let ignore = false;
 
     async function load() {
       try {
         setLoading(true);
+        setError("");
+
         const res = await fetch("/api/news", { cache: "no-store" });
+        if (!res.ok) throw new Error(`News API Error: ${res.status}`);
+
         const data: NewsApiResponse = await res.json();
         if (!ignore) setRows(data?.results || []);
-      } catch {
+      } catch (e: any) {
         if (!ignore) setRows([]);
+        if (!ignore) setError(e?.message || "Failed to load news.");
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -56,6 +65,50 @@ export default function AdminNewsList() {
     return rows.filter((n) => (n.title || "").toLowerCase().includes(s));
   }, [q, rows]);
 
+  // ✅ DELETE handler
+  const handleDelete = async (id: number, title: string) => {
+    setError("");
+
+    const ok = window.confirm(`আপনি কি নিশ্চিত ডিলিট করতে চান?\n\n"${title}"`);
+    if (!ok) return;
+
+    setDeletingId(id);
+
+    // optional: optimistic UI (remove from screen first)
+    const prev = rows;
+    setRows((r) => r.filter((x) => x.id !== id));
+
+    try {
+      // ✅ If your API needs auth, send token.
+      // Change this if your token is stored differently.
+      const access = typeof window !== "undefined" ? localStorage.getItem("access") : null;
+
+      const res = await fetch(`/api/news/${id}`, {
+        method: "DELETE",
+        headers: access ? { Authorization: `Bearer ${access}` } : undefined,
+      });
+
+      if (!res.ok) {
+        // rollback
+        setRows(prev);
+
+        const data = await res.json().catch(() => ({}));
+        const msg =
+          data?.detail ||
+          data?.error ||
+          `Delete failed (status ${res.status}).`;
+
+        throw new Error(msg);
+      }
+
+      // success ✅
+    } catch (e: any) {
+      setError(e?.message || "Delete failed.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -68,6 +121,12 @@ export default function AdminNewsList() {
           নিউজ যোগ করুন
         </Link>
       </div>
+
+      {error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
 
       <div className="bg-white rounded-xl border p-4">
         <input
@@ -103,9 +162,9 @@ export default function AdminNewsList() {
                   <td className="px-4 py-3 font-medium text-gray-900">
                     {n.title}
                   </td>
-                  <td className="px-4 py-3 text-gray-700">
-                    #{n.category}
-                  </td>
+
+                  <td className="px-4 py-3 text-gray-700">#{n.category}</td>
+
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
@@ -117,21 +176,32 @@ export default function AdminNewsList() {
                       {n.is_published ? "পাবলিশড" : "ড্রাফট"}
                     </span>
                   </td>
+
                   <td className="px-4 py-3 text-gray-700">
                     {formatBnDate(n.created_at)}
                   </td>
+
                   <td className="px-4 py-3 flex gap-2">
                     <Link
                       href={`/news-detail/${n.id}`}
-                      className="px-3 py-1 rounded-md bg-yellow-400 text-black text-sm font-semibold"
+                      className="px-3 py-1 rounded-md bg-yellow-400 text-black text-sm font-semibold hover:bg-yellow-500"
                     >
                       ভিউ
                     </Link>
-                    <button className="px-3 py-1 rounded-md bg-sky-500 text-white text-sm font-semibold">
+
+                    <Link
+                      href={`/admin/news/${n.id}/edit`}
+                      className="px-3 py-1 rounded-md bg-sky-500 text-white text-sm font-semibold hover:bg-sky-600"
+                    >
                       এডিট
-                    </button>
-                    <button className="px-3 py-1 rounded-md bg-rose-500 text-white text-sm font-semibold">
-                      ডিলিট
+                    </Link>
+
+                    <button
+                      onClick={() => handleDelete(n.id, n.title)}
+                      disabled={deletingId === n.id}
+                      className="px-3 py-1 rounded-md bg-rose-500 text-white text-sm font-semibold hover:bg-rose-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {deletingId === n.id ? "ডিলিট হচ্ছে..." : "ডিলিট"}
                     </button>
                   </td>
                 </tr>
